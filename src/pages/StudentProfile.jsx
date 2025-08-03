@@ -148,7 +148,7 @@ const StudentProfile = () => {
             {/* 🟢 صورة الطالب الدائرية مع إطار ذهبي */}
             <div className="relative">
               <img
-                src={student.image || "https://example.com/default-image.jpg"}
+                src={student.student_img || "https://example.com/default-image.jpg"}
                 alt={student.name}
                 onError={(e) => {
                   e.target.onerror = null; // منع التكرار
