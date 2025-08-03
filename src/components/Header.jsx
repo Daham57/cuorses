@@ -52,9 +52,9 @@ const Header = () => {
     const baseItems = [
       { name: "الرئيسية", path: "/" },
       { name: "الدورات", path: "/courses" },
-      { name: "المدرسون", path: "/instructors" }, // ← تم تبديله مع "اتصل بنا"
-      { name: "الطلاب", path: "/students" },
       { name: "اتصل بنا", path: "/contact" },
+      { name: "الطلاب", path: "/students" },
+      { name: "المدرسون", path: "/instructors" },
     ];
     return baseItems;
   };
@@ -116,6 +116,7 @@ const Header = () => {
       }
     } else {
       alert("دور المستخدم غير معروف.");
+      return;
     }
   };
 
@@ -158,7 +159,7 @@ const Header = () => {
           </div>
 
           <div className="hidden md:flex items-center space-x-4 rtl:space-x-reverse">
-            {isLoggedIn && (
+            {isLoggedIn ? (
               <div className="flex items-center space-x-4 rtl:space-x-reverse">
                 <button
                   onClick={handleMyAccountClick}
@@ -175,6 +176,15 @@ const Header = () => {
                   <span className="font-cairo">تسجيل الخروج</span>
                 </button>
               </div>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-white font-cairo hover:text-islamic-golden transition-colors"
+                >
+                  تسجيل الدخول
+                </Link>
+              </>
             )}
           </div>
 
@@ -187,45 +197,34 @@ const Header = () => {
         </div>
 
         {isMenuOpen && (
-          <div className="md:hidden mt-4 bg-white rounded-lg shadow-lg p-4">
-            {navItems.map((item) => (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={`block py-2 px-4 font-cairo transition-colors ${
-                  location.pathname === item.path
-                    ? "text-islamic-primary bg-islamic-gray-light"
-                    : "text-gray-700 hover:text-islamic-primary hover:bg-gray-50"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                {item.name}
-              </Link>
-            ))}
-            <div className="border-t pt-4 mt-4">
-              {isLoggedIn && (
-                <>
-                  <button
-                    onClick={() => {
-                      handleMyAccountClick();
-                      setIsMenuOpen(false);
-                    }}
-                    className="block py-2 px-4 text-gray-700 hover:text-islamic-primary font-cairo"
-                  >
-                    {userFullName || "حسابي"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleLogout();
-                      setIsMenuOpen(false);
-                    }}
-                    className="block py-2 px-4 text-red-600 hover:text-red-800 font-cairo w-full text-right"
-                  >
-                    تسجيل الخروج
-                  </button>
-                </>
-              )}
-            </div>
+          <div className="hidden md:flex items-center space-x-4 rtl:space-x-reverse">
+            {isLoggedIn ? (
+              <div className="flex items-center space-x-4 rtl:space-x-reverse">
+                <button
+                  onClick={handleMyAccountClick}
+                  className="flex items-center space-x-2 rtl:space-x-reverse text-white hover:text-islamic-golden transition-colors"
+                >
+                  <User size={20} />
+                  <span className="font-cairo">{userFullName || "حسابي"}</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center space-x-2 rtl:space-x-reverse text-white hover:text-red-400 transition-colors"
+                >
+                  <LogOut size={20} />
+                  <span className="font-cairo">تسجيل الخروج</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="bg-islamic-golden text-white px-4 py-2 rounded-lg font-cairo hover:bg-opacity-90 transition-colors"
+                >
+                  تسجيل الدخول
+                </Link>
+              </>
+            )}
           </div>
         )}
       </nav>

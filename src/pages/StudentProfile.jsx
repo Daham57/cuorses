@@ -325,27 +325,40 @@ const StudentProfile = () => {
               </h3>
 
               <div className="space-y-3">
-                {student.quran_passed_parts &&
-                student.quran_passed_parts.length > 0 ? (
-                  student.quran_passed_parts.map((juz, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center space-x-3 rtl:space-x-reverse p-3 bg-green-50 rounded-lg"
-                    >
-                      <Award size={20} className="text-green-600" />
-                      <span className="font-cairo font-medium text-islamic-dark">
-                        {juz}
-                      </span>
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-cairo">
-                        مكتمل
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="font-cairo text-gray-500">
-                    لا يوجد أجزاء تم سبرها
-                  </p>
-                )}
+                {(() => {
+                  // معالجة الحالات المختلفة:
+                  const rawParts = student.quran_passed_parts;
+
+                  const partsArray = Array.isArray(rawParts)
+                    ? rawParts
+                    : typeof rawParts === "string"
+                    ? rawParts
+                        .split(",")
+                        .map((part) => part.trim())
+                        .filter(Boolean)
+                    : [];
+
+                  return partsArray.length > 0 ? (
+                    partsArray.map((juz, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center space-x-3 rtl:space-x-reverse p-3 bg-green-50 rounded-lg"
+                      >
+                        <Award size={20} className="text-green-600" />
+                        <span className="font-cairo font-medium text-islamic-dark">
+                          {juz}
+                        </span>
+                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-cairo">
+                          مكتمل
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="font-cairo text-gray-500">
+                      لا يوجد أجزاء تم سبرها
+                    </p>
+                  );
+                })()}
               </div>
 
               <div className="mt-6 text-center">
