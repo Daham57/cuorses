@@ -1,4 +1,27 @@
 // 🟢 بيانات وهمية شاملة للتطبيق - تحتوي على جميع المعلومات اللازمة للطلاب والمدرسين والدورات
+export const Recitations = [
+  
+  {
+    student_id: 1,
+    student_name: "نوار الغزالي",
+    recitation_per_page: [2, 4, 5],
+    recitation_evaluation: "جيد",
+    current_juz: "جزء عم",
+    current_juz_page: 6,
+    recitation_notes: "التسميع يحناج إعادة",
+    homework: [2, 34],
+  },
+  {
+    student_id: 2,
+    student_name: "محمد نور محمد",
+    recitation_per_page: [2, 4, 5],
+    recitation_evaluation: "جيد",
+    current_juz: "جزء عم",
+    current_juz_page: 21,
+    recitation_notes: "التسميع يحناج إعادة",
+    homework: [2, 34],
+  },
+];
 export const courses = [
   {
     id: 1,
@@ -1106,7 +1129,7 @@ export const topics = [
     description: "دراسة سيرة النبي محمد صلى الله عليه وسلم",
   },
 ];
-export const NGROK_BASE_URL = 'https://348a47dbea99.ngrok-free.app/api/v1';
+export const NGROK_BASE_URL = "https://d24f80be3d0d.ngrok-free.app/api/v1";
 
 // src/api/getInstructors.js
 import axios from "axios";
@@ -1158,11 +1181,11 @@ export const getStudents = async () => {
     return [];
   }
 };
-export const getAttendance = async () => {
+export const getAttendance = async (lessonID) => {
   try {
     const token = localStorage.getItem("token");
 
-    const res = await axios.get(`${NGROK_BASE_URL}/atten`, {
+    const res = await axios.get(`${NGROK_BASE_URL}/atten/${lessonID}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -1170,19 +1193,10 @@ export const getAttendance = async () => {
       },
     });
 
-    console.log("Attendance fetched:", res.data);
-
-    if (Array.isArray(res.data)) {
-      return res.data;
-    } else if (Array.isArray(res.data.attendance)) {
-      return res.data.attendance;
-    } else {
-      console.error("Unexpected attendance data structure:", res.data);
-      return [];
-    }
+    return res.data; // أو حسب هيكل البيانات اللي بدك ترجعها
   } catch (error) {
-    console.error("Error fetching attendance:", error);
-    return [];
+    console.error("Error fetching attendance: ", error);
+    throw error; // أو تعامل مع الخطأ حسب حاجتك
   }
 };
 
@@ -1244,18 +1258,20 @@ export const getRecitationsByCourseId = async (courseId) => {
   try {
     const token = localStorage.getItem("token");
 
-    const res = await axios.get(`${NGROK_BASE_URL}/recitation/course/${courseId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true"
+    const res = await axios.get(
+      `${NGROK_BASE_URL}/recitation/course/${courseId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
       }
-    });
+    );
 
     console.log("Recitations by course fetched:", res.data);
 
     return Array.isArray(res.data) ? res.data : res.data.recitations || [];
-
   } catch (error) {
     console.error("Error fetching recitations by course:", error);
     return [];

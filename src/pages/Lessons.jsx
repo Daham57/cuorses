@@ -24,7 +24,8 @@ const Lessons = () => {
   const [expandedExamIds, setExpandedExamIds] = useState([]);
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  const [detailedStudents, setDetailedStudents] = useState([]);
+  const [attendance, setAttendance] = useState([]);
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -34,18 +35,39 @@ const Lessons = () => {
     return null;
   }
 
-  const toggleLesson = (id) => {
-    setExpandedLessonIds((prev) =>
-      prev.includes(id) ? prev.filter((lid) => lid !== id) : [...prev, id]
-    );
-  };
+  const toggleLesson = async (id) => {
+    if (expandedLessonIds.includes(id)) {
+      setExpandedLessonIds((prev) => prev.filter((lid) => lid !== id));
+    } else {
+      if (!attendance[id]) {
+        try {
+          setLoadingLessonId(id);
+          const response = await getAttendance(id);
 
+          // تنظيف البيانات مباشرة هنا:
+          const cleanData = (response?.attendances || []).map((a) => ({
+            student_attendance: a.student_attendance,
+            student_attendance_time: a.student_attendance_time,
+            student: {
+              name: a.students?.name || "غير معروف",
+              id: a.students?.id,
+            },
+          }));
+
+          setAttendance((prev) => ({ ...prev, [id]: cleanData }));
+        } catch (error) {
+          console.error("فشل تحميل الحضور:", error);
+          setAttendance((prev) => ({ ...prev, [id]: [] }));
+        } finally {
+          setLoadingLessonId(null);
+        }
+      }
+      setExpandedLessonIds((prev) => [...prev, id]);
+    }
+  };
   const handleViewProfile = (student) => {
     navigate(`/student-profile/${student.id}`);
   };
-
-  const [detailedStudents, setDetailedStudents] = useState([]);
-  const [attendance, setAttendance] = useState([]);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -65,21 +87,13 @@ const Lessons = () => {
       fetchStudents();
     }
   }, [course]);
- useEffect(() => {
-      const fetchAttendance = async () => {
-        const data = await getAttendance();
-        setAttendance(data);
-      };
-
-      fetchAttendance();
-    }, []);
 
   useEffect(() => {
     const fetchExams = async () => {
       const data = await getExams();
       // Filter exams for this specific course
-      const courseExams = data.filter(exam => 
-        exam.exam && exam.exam.course_id === course.id
+      const courseExams = data.filter(
+        (exam) => exam.exam && exam.exam.course_id === course.id
       );
       setExams(courseExams);
     };
@@ -98,25 +112,25 @@ const Lessons = () => {
   const handleFileDownload = (file) => {
     try {
       // Create a temporary anchor element for download
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = file.file_path;
       link.download = file.file_name;
-      link.target = '_blank';
-      
+      link.target = "_blank";
+
       // Append to body, click, and remove
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Error downloading file:', error);
-      alert('حدث خطأ أثناء تحميل الملف');
+      console.error("Error downloading file:", error);
+      alert("حدث خطأ أثناء تحميل الملف");
     }
   };
 
   if (loading) {
     return (
-      <LoadingSpinner 
-        message="جاري تحميل تفاصيل الدورة..." 
+      <LoadingSpinner
+        message="جاري تحميل تفاصيل الدورة..."
         fullScreen={true}
         size="xlarge"
       />
@@ -254,19 +268,17 @@ const Lessons = () => {
         </div>
       </section>
 
-      {/* قائمة الدروس */}
       <section className="py-16">
         <div className="container mx-auto px-4">
           <h2 className="font-amiri text-3xl font-bold text-islamic-primary mb-8">
-            الدروس والجلسات
+            الجلسات التعليمية
           </h2>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             {course.lessons?.map((lesson) => {
-              const lessonAttendance = attendance.filter(
-                (a) => a.lesson.id === lesson.id
-              );
-
+              const lessonAttendance = Array.isArray(attendance[lesson.id])
+                ? attendance[lesson.id]
+                : [];
               const attendanceRate =
                 course.students.length > 0
                   ? (lessonAttendance.filter((a) => a.student_attendance)
@@ -274,23 +286,23 @@ const Lessons = () => {
                       course.students.length) *
                     100
                   : 0;
-
               const isExpanded = expandedLessonIds.includes(lesson.id);
 
               return (
                 <div
                   key={lesson.id}
-                  className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300"
+                  className="bg-white rounded-xl border border-gray-200 shadow-sm transition-all duration-300"
                 >
+                  {/* عنوان الجلسة */}
                   <button
                     onClick={() => toggleLesson(lesson.id)}
-                    className="w-full flex justify-between items-center p-4 font-cairo text-lg font-bold text-islamic-dark hover:bg-islamic-gray-light transition rounded-t-lg"
+                    className="w-full flex justify-between items-center p-4 font-cairo text-lg font-bold text-islamic-dark bg-gray-50 hover:bg-gray-100 rounded-t-xl"
                   >
-                    <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <div className="flex items-center gap-2 rtl:space-x-reverse">
                       <Calendar size={18} className="text-islamic-primary" />
-                      <span>{lesson.lesson_title}</span>
+                      <span>{lesson.lesson_title || "جلسة بدون عنوان"}</span>
                       {new Date(lesson.lesson_date) >= new Date() && (
-                        <span className="text-xs text-green-600 font-cairo ml-2">
+                        <span className="text-xs text-green-600 ml-2">
                           قادم
                         </span>
                       )}
@@ -302,83 +314,88 @@ const Lessons = () => {
                     )}
                   </button>
 
+                  {/* التفاصيل */}
                   {isExpanded && (
-                    <div className="p-6 border-t border-gray-200 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      <div>
-                        <div className="space-y-2 mb-4">
-                          <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                            <Calendar
-                              size={18}
-                              className="text-islamic-primary"
-                            />
-                            <span className="font-cairo text-gray-600">
-                              {lesson.lesson_date}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                            <Clock size={18} className="text-islamic-golden" />
-                            <span className="font-cairo text-gray-600">
-                              {course.course_start_time}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-green-500 h-2 rounded-full"
-                            style={{ width: `${attendanceRate}%` }}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 border-t border-gray-100 bg-white">
+                      {/* التاريخ والوقت ونسبة الحضور */}
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-2 text-gray-600 mb-2">
+                          <Calendar
+                            size={18}
+                            className="text-islamic-primary"
                           />
+                          <span className="font-cairo">
+                            {lesson.lesson_date}
+                          </span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 font-cairo">
+                        <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
+                          <Clock size={18} className="text-islamic-golden" />
+                          <span className="font-cairo">
+                            {course.course_start_time || "غير محدد"}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div
+                            className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${attendanceRate}%` }}
+                          ></div>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-2 font-cairo">
                           نسبة الحضور: {Math.round(attendanceRate)}%
                         </p>
                       </div>
 
+                      {/* قائمة الحضور */}
                       <div>
-                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-primary">
+                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-golden flex items-center gap-2">
+                          <Users size={18} className="text-islamic-primary" />
                           الحضور ({lessonAttendance.length} طالب)
                         </h4>
-                        <div className="space-y-1">
-                          {lessonAttendance.map((record) => (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {lessonAttendance.map((record, index) => (
                             <div
-                              key={record.id}
-                              className="flex items-center space-x-2 rtl:space-x-reverse"
+                              key={index}
+                              className="flex items-center gap-2 font-cairo text-sm text-gray-700"
                             >
                               <div
                                 className={`w-2 h-2 rounded-full ${
                                   record.student_attendance
                                     ? "bg-green-500"
-                                    : "bg-red-500"
+                                    : "bg-red-400"
                                 }`}
-                              ></div>
-                              <span className="font-cairo text-gray-700 text-sm">
-                                {record.student.name}
-                              </span>
+                              />
+                              <span>{record.student.name}</span>
+                              {!record.student_attendance && (
+                                <span className="text-xs text-gray-400">
+                                  (غائب)
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>
                       </div>
 
+                      {/* أوقات الحضور */}
                       <div>
-                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-primary">
+                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-golden flex items-center gap-2">
+                          <Clock size={18} className="text-islamic-primary" />
                           وقت حضور الطالب
                         </h4>
-                        <ul className="space-y-2">
-                          {lessonAttendance.map((record) => (
-                            <li
-                              key={record.id}
-                              className="flex items-start space-x-2 rtl:space-x-reverse"
+                        <div className="space-y-2 max-h-48 overflow-y-auto text-sm text-gray-700 font-cairo">
+                          {lessonAttendance.map((record, index) => (
+                            <div
+                              key={index}
+                              className="flex justify-between border-b pb-1 border-gray-100"
                             >
-                              <Award
-                                size={16}
-                                className="text-islamic-golden mt-1 flex-shrink-0"
-                              />
-                              <span className="font-cairo text-gray-700 text-sm">
-                                {record.student_attendance_time}
+                              <span>{record.student.name}</span>
+                              <span>
+                                {record.student_attendance
+                                  ? record.student_attendance_time || "-"
+                                  : "-"}
                               </span>
-                            </li>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -405,21 +422,30 @@ const Lessons = () => {
                   if (!acc[examId]) {
                     acc[examId] = {
                       exam: examRecord.exam,
-                      students: []
+                      students: [],
                     };
                   }
                   acc[examId].students.push({
                     ...examRecord.student,
-                    student_mark: examRecord.student_mark
+                    student_mark: examRecord.student_mark,
                   });
                   return acc;
                 }, {})
               ).map((examGroup) => {
                 const isExpanded = expandedExamIds.includes(examGroup.exam.id);
-                const averageMark = examGroup.students.length > 0 
-                  ? Math.round(examGroup.students.reduce((sum, student) => sum + student.student_mark, 0) / examGroup.students.length)
-                  : 0;
-                const passedStudents = examGroup.students.filter(student => student.student_mark >= examGroup.exam.passing_mark).length;
+                const averageMark =
+                  examGroup.students.length > 0
+                    ? Math.round(
+                        examGroup.students.reduce(
+                          (sum, student) => sum + student.student_mark,
+                          0
+                        ) / examGroup.students.length
+                      )
+                    : 0;
+                const passedStudents = examGroup.students.filter(
+                  (student) =>
+                    student.student_mark >= examGroup.exam.passing_mark
+                ).length;
 
                 return (
                   <div
@@ -439,11 +465,17 @@ const Lessons = () => {
                           <div className="flex items-center space-x-4 rtl:space-x-reverse text-sm text-gray-600">
                             <div className="flex items-center space-x-1 rtl:space-x-reverse">
                               <Calendar size={16} />
-                              <span>{new Date(examGroup.exam.exam_date).toLocaleDateString('ar-SA')}</span>
+                              <span>
+                                {new Date(
+                                  examGroup.exam.exam_date
+                                ).toLocaleDateString("ar-SA")}
+                              </span>
                             </div>
                             <div className="flex items-center space-x-1 rtl:space-x-reverse">
                               <Award size={16} />
-                              <span>الدرجة الكاملة: {examGroup.exam.max_mark}</span>
+                              <span>
+                                الدرجة الكاملة: {examGroup.exam.max_mark}
+                              </span>
                             </div>
                             <div className="flex items-center space-x-1 rtl:space-x-reverse">
                               <Users size={16} />
@@ -455,11 +487,15 @@ const Lessons = () => {
                       <div className="flex items-center space-x-4 rtl:space-x-reverse">
                         <div className="text-center">
                           <div className="text-sm text-gray-500">المتوسط</div>
-                          <div className="text-lg font-bold text-islamic-primary">{averageMark}</div>
+                          <div className="text-lg font-bold text-islamic-primary">
+                            {averageMark}
+                          </div>
                         </div>
                         <div className="text-center">
                           <div className="text-sm text-gray-500">نجح</div>
-                          <div className="text-lg font-bold text-green-600">{passedStudents}</div>
+                          <div className="text-lg font-bold text-green-600">
+                            {passedStudents}
+                          </div>
                         </div>
                         {isExpanded ? (
                           <ChevronUp size={20} />
@@ -476,39 +512,52 @@ const Lessons = () => {
                             <div className="text-2xl font-bold text-islamic-primary mb-1">
                               {examGroup.exam.max_mark}
                             </div>
-                            <div className="text-sm text-gray-600">الدرجة الكاملة</div>
+                            <div className="text-sm text-gray-600">
+                              الدرجة الكاملة
+                            </div>
                           </div>
                           <div className="bg-islamic-gray-light p-4 rounded-lg">
                             <div className="text-2xl font-bold text-islamic-golden mb-1">
                               {examGroup.exam.passing_mark}
                             </div>
-                            <div className="text-sm text-gray-600">درجة النجاح</div>
+                            <div className="text-sm text-gray-600">
+                              درجة النجاح
+                            </div>
                           </div>
                           <div className="bg-islamic-gray-light p-4 rounded-lg">
                             <div className="text-2xl font-bold text-green-600 mb-1">
-                              {Math.round((passedStudents / examGroup.students.length) * 100)}%
+                              {Math.round(
+                                (passedStudents / examGroup.students.length) *
+                                  100
+                              )}
+                              %
                             </div>
-                            <div className="text-sm text-gray-600">نسبة النجاح</div>
+                            <div className="text-sm text-gray-600">
+                              نسبة النجاح
+                            </div>
                           </div>
                         </div>
 
                         <h4 className="font-cairo font-bold text-lg mb-4 text-islamic-primary">
                           نتائج الطلاب ({examGroup.students.length} طالب)
                         </h4>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {examGroup.students.map((student) => (
                             <div
                               key={student.id}
                               className={`p-4 rounded-lg border-2 ${
-                                student.student_mark >= examGroup.exam.passing_mark
-                                  ? 'border-green-200 bg-green-50'
-                                  : 'border-red-200 bg-red-50'
+                                student.student_mark >=
+                                examGroup.exam.passing_mark
+                                  ? "border-green-200 bg-green-50"
+                                  : "border-red-200 bg-red-50"
                               }`}
                             >
                               <div className="flex items-center space-x-3 rtl:space-x-reverse mb-3">
                                 <img
-                                  src={student.student_img || '/default-avatar.png'}
+                                  src={
+                                    student.student_img || "/default-avatar.png"
+                                  }
                                   alt={student.name}
                                   className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
                                 />
@@ -521,35 +570,56 @@ const Lessons = () => {
                                   </p>
                                 </div>
                               </div>
-                              
+
                               <div className="flex justify-between items-center">
                                 <div className="text-center">
-                                  <div className="text-sm text-gray-500 font-cairo">الدرجة</div>
-                                  <div className={`text-xl font-bold ${
-                                    student.student_mark >= examGroup.exam.passing_mark
-                                      ? 'text-green-600'
-                                      : 'text-red-600'
-                                  }`}>
+                                  <div className="text-sm text-gray-500 font-cairo">
+                                    الدرجة
+                                  </div>
+                                  <div
+                                    className={`text-xl font-bold ${
+                                      student.student_mark >=
+                                      examGroup.exam.passing_mark
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
                                     {student.student_mark}
                                   </div>
                                 </div>
                                 <div className="text-center">
-                                  <div className="text-sm text-gray-500 font-cairo">النسبة</div>
-                                  <div className={`text-lg font-bold ${
-                                    student.student_mark >= examGroup.exam.passing_mark
-                                      ? 'text-green-600'
-                                      : 'text-red-600'
-                                  }`}>
-                                    {Math.round((student.student_mark / examGroup.exam.max_mark) * 100)}%
+                                  <div className="text-sm text-gray-500 font-cairo">
+                                    النسبة
+                                  </div>
+                                  <div
+                                    className={`text-lg font-bold ${
+                                      student.student_mark >=
+                                      examGroup.exam.passing_mark
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    {Math.round(
+                                      (student.student_mark /
+                                        examGroup.exam.max_mark) *
+                                        100
+                                    )}
+                                    %
                                   </div>
                                 </div>
                                 <div className="text-center">
-                                  <span className={`px-3 py-1 rounded-full text-sm font-cairo ${
-                                    student.student_mark >= examGroup.exam.passing_mark
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-red-100 text-red-800'
-                                  }`}>
-                                    {student.student_mark >= examGroup.exam.passing_mark ? 'نجح' : 'راسب'}
+                                  <span
+                                    className={`px-3 py-1 rounded-full text-sm font-cairo ${
+                                      student.student_mark >=
+                                      examGroup.exam.passing_mark
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                    }`}
+                                  >
+                                    {student.student_mark >=
+                                    examGroup.exam.passing_mark
+                                      ? "نجح"
+                                      : "راسب"}
                                   </span>
                                 </div>
                               </div>

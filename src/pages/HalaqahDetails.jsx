@@ -7,9 +7,10 @@ import {
   Award,
   ChevronDown,
   ChevronUp,
+  Book,
   Users,
 } from "lucide-react";
-import { getAttendance, getRecitationsByCourseId } from "../data/mockData";
+import { getAttendance, Recitations } from "../data/mockData";
 import StudentCard from "@/components/StudentCard";
 
 const HalaqahDetails = () => {
@@ -18,8 +19,8 @@ const HalaqahDetails = () => {
   const { halaqah, course } = location.state || {};
 
   const [expandedLessonIds, setExpandedLessonIds] = useState([]);
-  const [attendance, setAttendance] = useState([]);
-  const [recitations, setRecitations] = useState({ recitations_by_lesson: [] });
+  const [attendance, setAttendance] = useState({});
+  const [loadingLessonId, setLoadingLessonId] = useState(null);
 
   if (!halaqah) {
     navigate("/courses");
@@ -30,40 +31,45 @@ const HalaqahDetails = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  useEffect(() => {
-    async function fetchAttendance() {
-      const data = await getAttendance();
-      setAttendance(data);
-    }
-    fetchAttendance();
-  }, []);
+  
 
-  useEffect(() => {
-    async function fetchRecitations() {
-      try {
-        const data = await getRecitationsByCourseId(halaqah.id);
-        setRecitations(data);
-      } catch (error) {
-        console.error("خطأ أثناء تحميل التسميعات:", error);
+  const toggleLesson = async (id) => {
+    if (expandedLessonIds.includes(id)) {
+      setExpandedLessonIds((prev) => prev.filter((lid) => lid !== id));
+    } else {
+      if (!attendance[id]) {
+        try {
+          setLoadingLessonId(id);
+          const response = await getAttendance(id);
+
+          // تنظيف البيانات مباشرة هنا:
+          const cleanData = (response?.attendances || []).map((a) => ({
+            student_attendance: a.student_attendance,
+            student_attendance_time: a.student_attendance_time,
+            student: {
+              name: a.students?.name || "غير معروف",
+              id: a.students?.id,
+            },
+          }));
+
+          setAttendance((prev) => ({ ...prev, [id]: cleanData }));
+        } catch (error) {
+          console.error("فشل تحميل الحضور:", error);
+          setAttendance((prev) => ({ ...prev, [id]: [] }));
+        } finally {
+          setLoadingLessonId(null);
+        }
       }
+      setExpandedLessonIds((prev) => [...prev, id]);
     }
-    fetchRecitations();
-  }, [halaqah.id]);
-
-  const toggleLesson = (id) => {
-    setExpandedLessonIds((prev) =>
-      prev.includes(id) ? prev.filter((lid) => lid !== id) : [...prev, id]
-    );
   };
 
   const handleViewProfile = (student) => {
     navigate(`/student-profile/${student.id}`);
   };
-console.log("isArray?", Array.isArray(studentRecitation?.recitation_per_page));
 
   return (
     <div className="min-h-screen bg-islamic-gray-light pt-20">
-      {/* زر الرجوع */}
       <div className="container mx-auto px-4 py-4">
         <button
           onClick={() => navigate("/tahfeez-course", { state: { course } })}
@@ -74,7 +80,6 @@ console.log("isArray?", Array.isArray(studentRecitation?.recitation_per_page));
         </button>
       </div>
 
-      {/* معلومات الحلقة */}
       <section className="bg-white py-12 shadow-sm">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -124,48 +129,41 @@ console.log("isArray?", Array.isArray(studentRecitation?.recitation_per_page));
         </div>
       </section>
 
-      {/* قائمة الجلسات */}
       <section className="py-16">
         <div className="container mx-auto px-4">
           <h2 className="font-amiri text-3xl font-bold text-islamic-primary mb-8">
             الجلسات التعليمية
           </h2>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             {halaqah.lessons?.map((lesson) => {
-              const lessonAttendance = attendance.filter(
-                (a) => a.lesson.id === lesson.id
-              );
+              const lessonAttendance = Array.isArray(attendance[lesson.id])
+                ? attendance[lesson.id]
+                : [];
+                const totalMarked =
+  lessonAttendance.filter((a) => a.student_attendance === 1 || a.student_attendance === 0).length;
 
               const attendanceRate =
-                halaqah.students.length > 0
-                  ? (lessonAttendance.filter((a) => a.student_attendance)
-                      .length /
-                      halaqah.students.length) *
-                    100
-                  : 0;
+  totalMarked > 0
+    ? (lessonAttendance.filter((a) => a.student_attendance === 1).length / totalMarked) * 100
+    : 0;
 
               const isExpanded = expandedLessonIds.includes(lesson.id);
-
-              // استخرج تسميعات هذا الدرس من الريسيتيشن
-              const lessonRecitations = recitations.recitations_by_lesson?.find(
-                (l) => Number(l.lesson_id) === Number(lesson.id)
-              )?.recitations;
-
               return (
                 <div
                   key={lesson.id}
-                  className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300"
+                  className="bg-white rounded-xl border border-gray-200 shadow-sm transition-all duration-300"
                 >
+                  {/* عنوان الجلسة */}
                   <button
                     onClick={() => toggleLesson(lesson.id)}
-                    className="w-full flex justify-between items-center p-4 font-cairo text-lg font-bold text-islamic-dark hover:bg-islamic-gray-light transition rounded-t-lg"
+                    className="w-full flex justify-between items-center p-4 font-cairo text-lg font-bold text-islamic-dark bg-gray-50 hover:bg-gray-100 rounded-t-xl"
                   >
-                    <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <div className="flex items-center gap-2 rtl:space-x-reverse">
                       <Calendar size={18} className="text-islamic-primary" />
                       <span>{lesson.lesson_title || "جلسة بدون عنوان"}</span>
                       {new Date(lesson.lesson_date) >= new Date() && (
-                        <span className="text-xs text-green-600 font-cairo ml-2">
+                        <span className="text-xs text-green-600 ml-2">
                           قادم
                         </span>
                       )}
@@ -176,190 +174,136 @@ console.log("isArray?", Array.isArray(studentRecitation?.recitation_per_page));
                       <ChevronDown size={20} />
                     )}
                   </button>
+
+                  {/* التفاصيل */}
                   {isExpanded && (
-                    <div className="p-6 border-t border-gray-200 grid grid-cols-1 lg:grid-cols-4 gap-6">
-                      {/* معلومات الجلسة */}
-                      <div>
-                        <div className="space-y-2 mb-4">
-                          <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                            <Calendar
-                              size={18}
-                              className="text-islamic-primary"
-                            />
-                            <span className="font-cairo text-gray-600">
-                              {lesson.lesson_date}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                            <Clock size={18} className="text-islamic-golden" />
-                            <span className="font-cairo text-gray-600">
-                              {halaqah.course_start_time || "غير محدد"}
-                            </span>
-                          </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 border-t border-gray-100 bg-white">
+                      {/* التاريخ والوقت ونسبة الحضور */}
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-2 text-gray-600 mb-2">
+                          <Calendar
+                            size={18}
+                            className="text-islamic-primary"
+                          />
+                          <span className="font-cairo">
+                            {lesson.lesson_date}
+                          </span>
                         </div>
-                        <div className="mt-4 w-full bg-gray-200 rounded-full h-2">
+                        <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
+                          <Clock size={18} className="text-islamic-golden" />
+                          <span className="font-cairo">
+                            {halaqah.course_start_time || "غير محدد"}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
                           <div
-                            className="bg-green-500 h-2 rounded-full"
+                            className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
                             style={{ width: `${attendanceRate}%` }}
                           ></div>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 font-cairo">
+                        <p className="text-sm text-gray-500 mt-2 font-cairo">
                           نسبة الحضور: {Math.round(attendanceRate)}%
                         </p>
                       </div>
 
-                      {/* الحضور */}
+                      {/* قائمة الحضور */}
                       <div>
-                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-primary">
+                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-golden flex items-center gap-2">
+                          <Users size={18} className="text-islamic-primary" />
                           الحضور ({lessonAttendance.length} طالب)
                         </h4>
-                        <div className="space-y-1 max-h-48 overflow-auto">
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
                           {lessonAttendance.map((record, index) => (
                             <div
                               key={index}
-                              className="flex items-center space-x-2 rtl:space-x-reverse"
+                              className="flex items-center gap-2 font-cairo text-sm text-gray-700"
                             >
                               <div
                                 className={`w-2 h-2 rounded-full ${
                                   record.student_attendance
                                     ? "bg-green-500"
-                                    : "bg-red-500"
+                                    : "bg-red-400"
                                 }`}
-                              ></div>
-                              <span className="font-cairo text-gray-700 text-sm">
-                                {record.student.name}
+                              />
+                              <span>{record.student.name}</span>
+                              {!record.student_attendance && (
+                                <span className="text-xs text-gray-400">
+                                  (غائب)
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* أوقات الحضور */}
+                      <div>
+                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-golden flex items-center gap-2">
+                          <Clock size={18} className="text-islamic-primary" />
+                          وقت حضور الطالب
+                        </h4>
+                        <div className="space-y-2 max-h-48 overflow-y-auto text-sm text-gray-700 font-cairo">
+                          {lessonAttendance.map((record, index) => (
+                            <div
+                              key={index}
+                              className="flex justify-between border-b pb-1 border-gray-100"
+                            >
+                              <span>{record.student.name}</span>
+                              <span>
+                                {record.student_attendance
+                                  ? record.student_attendance_time || "-"
+                                  : "-"}
                               </span>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      {/* وقت حضور الطالب */}
+                      {/* التسميعات */}
                       <div>
-                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-primary">
-                          وقت حضور الطالب
+                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-golden flex items-center gap-2">
+                          <Book size={18} className="text-islamic-primary" />
+                          التسميعات
                         </h4>
-                        <ul className="space-y-2 max-h-48 overflow-auto">
-                          {lessonAttendance.map((record, index) => (
-                            <li
-                              key={index}
-                              className="flex items-start space-x-2 rtl:space-x-reverse"
-                            >
-                              <Award
-                                size={16}
-                                className="text-islamic-golden mt-1 flex-shrink-0"
-                              />
-                              <span className="font-cairo text-gray-700 text-sm">
-                                {record.student_attendance_time || "-"}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      {/* إنجاز التسميع */}
-                      <div>
-                        <h4 className="font-cairo font-bold text-lg mb-3 text-islamic-primary">
-                          إنجاز التسميع
-                        </h4>
-                        <ul className="space-y-2 max-h-48 overflow-auto">
-                          {lessonAttendance.map((record, index) => {
-                            // إيجاد تسميع الطالب ضمن التسميعات الخاصة بالدرس
-                            const studentRecitation = lessonRecitations?.find(
-                              (rec) =>
-                                Number(rec.student_id) ===
-                                Number(record.student?.id)
-                            );
-
-                            return (
-                              <li
-                                key={index}
-                                className="font-cairo text-sm text-gray-700 space-y-1"
-                              >
-                                <div className="font-medium text-islamic-dark">
-                                  {record.student?.name}
+                        {Recitations.length > 0 ? (
+                          <ul className="list-disc list-inside font-cairo text-gray-700 text-sm max-h-48 overflow-auto space-y-2">
+                            {Recitations.map((recitation) => (
+                              <li key={recitation.student_id}>
+                                <div className="flex flex-col">
+                                  <span className="font-bold">
+                                    {recitation.student_name}
+                                  </span>
+                                  <span>
+                                    التقييم:{" "}
+                                    {recitation.recitation_evaluation ||
+                                      "غير مقيّم"}
+                                  </span>
+                                  <span>
+                                    الصفحات:{" "}
+                                    {Array.isArray(
+                                      recitation.recitation_per_page
+                                    )
+                                      ? recitation.recitation_per_page.join(
+                                          ", "
+                                        )
+                                      : "لا يوجد"}
+                                  </span>
                                 </div>
-                                <div className="flex items-center gap-4 text-xs">
-                                  <div>
-                                    <span className="font-bold text-islamic-primary">
-                                      الصفحات:
-                                    </span>{" "}
-                                    <span className="bg-islamic-gray-light px-2 py-1 rounded">
-                                      {Array.isArray(
-                                        studentRecitation?.recitation_per_page
-                                      )
-                                        ? studentRecitation.recitation_per_page.join(
-                                            ", "
-                                          )
-                                        : studentRecitation?.recitation_per_page ||
-                                          "لم يسمع"}
-                                          
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="font-bold text-islamic-golden">
-                                      التقييم:
-                                    </span>{" "}
-                                    <span
-                                      className={`px-2 py-1 rounded text-white ${
-                                        studentRecitation?.recitation_evaluation ===
-                                        "Excellent"
-                                          ? "bg-green-500"
-                                          : studentRecitation?.recitation_evaluation ===
-                                            "Very Good"
-                                          ? "bg-blue-500"
-                                          : studentRecitation?.recitation_evaluation ===
-                                            "Good"
-                                          ? "bg-yellow-500"
-                                          : studentRecitation?.recitation_evaluation
-                                          ? "bg-gray-500"
-                                          : "bg-red-500"
-                                      }`}
-                                    >
-                                      {studentRecitation?.recitation_evaluation ||
-                                        "لا يوجد"}
-                                    </span>
-                                  </div>
-                                </div>
-                                {studentRecitation?.current_juz && (
-                                  <div className="text-xs text-gray-600">
-                                    <span className="font-bold">
-                                      الجزء الحالي:
-                                    </span>{" "}
-                                    {studentRecitation.current_juz}{" "}
-                                    <span className="mr-2 font-bold">
-                                      الصفحة:
-                                    </span>{" "}
-                                    {studentRecitation.current_juz_page}
-                                  </div>
-                                )}
                               </li>
-                            );
-                          })}
-                        </ul>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="text-gray-500 font-cairo text-sm flex items-center gap-1">
+                            <span>📭</span>
+                            <span>لا توجد تسميعات لهذه الجلسة.</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
                 </div>
               );
             })}
-          </div>
-        </div>
-      </section>
-
-      {/* الطلاب */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <h2 className="font-amiri text-3xl font-bold text-islamic-primary mb-8 text-center">
-            الطلاب المسجلين في الحلقة {halaqah.title}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {halaqah.students.map((student) => (
-              <StudentCard
-                key={student.id}
-                student={student}
-                onViewProfile={handleViewProfile}
-              />
-            ))}
           </div>
         </div>
       </section>

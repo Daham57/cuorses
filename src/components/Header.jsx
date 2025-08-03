@@ -17,7 +17,6 @@ const Header = () => {
 
   const { isLoggedIn, userRole, userEmail, logout } = useContext(AuthContext);
 
-  // Fetch user's full name based on role and email
   useEffect(() => {
     const fetchUserName = async () => {
       if (!isLoggedIn || !userEmail || !userRole) return;
@@ -25,13 +24,17 @@ const Header = () => {
       try {
         if (userRole === "teacher") {
           const instructors = await getInstructors();
-          const currentUser = instructors.find(inst => inst.email === userEmail);
+          const currentUser = instructors.find(
+            (inst) => inst.email === userEmail
+          );
           if (currentUser) {
             setUserFullName(`${currentUser.name} - مدرس`);
           }
         } else if (userRole === "student") {
           const students = await getStudents();
-          const currentUser = students.find(student => student.email === userEmail);
+          const currentUser = students.find(
+            (student) => student.email === userEmail
+          );
           if (currentUser) {
             setUserFullName(`${currentUser.name} - طالب`);
           }
@@ -45,24 +48,14 @@ const Header = () => {
     fetchUserName();
   }, [isLoggedIn, userEmail, userRole]);
 
-  // تحديد عناصر التنقل بناءً على حالة تسجيل الدخول
   const getNavItems = () => {
     const baseItems = [
       { name: "الرئيسية", path: "/" },
       { name: "الدورات", path: "/courses" },
-      { name: "اتصل بنا", path: "/contact" },
+      { name: "المدرسون", path: "/instructors" }, // ← تم تبديله مع "اتصل بنا"
       { name: "الطلاب", path: "/students" },
-      { name: "المدرسون", path: "/instructors" }
+      { name: "اتصل بنا", path: "/contact" },
     ];
-
-    // إضافة روابط الطلاب والمدرسين فقط إذا لم يكن المستخدم مسجل دخول
-    // if (!isLoggedIn) {
-    //   baseItems.splice(1, 0, 
-    //     { name: "الطلاب", path: "/students" },
-    //     { name: "المدرسون", path: "/instructors" }
-    //   );
-    // }
-
     return baseItems;
   };
 
@@ -86,47 +79,45 @@ const Header = () => {
     navigate("/");
   };
 
-  // التعامل مع النقر على "حسابي"
-  
-const handleMyAccountClick = async () => {
-  if (userRole === "teacher") {
-    try {
-      const instructors = await getInstructors();
-      const currentInstructor = instructors.find(
-        (inst) => inst.email === userEmail
-      );
+  const handleMyAccountClick = async () => {
+    if (userRole === "teacher") {
+      try {
+        const instructors = await getInstructors();
+        const currentInstructor = instructors.find(
+          (inst) => inst.email === userEmail
+        );
 
-      if (currentInstructor) {
-        navigate(`/instructor-details/${currentInstructor.id}`, {
-          state: { instructor: currentInstructor },
-        });
-      } else {
-        alert("لم يتم العثور على بيانات المدرس.");
+        if (currentInstructor) {
+          navigate(`/instructor-details/${currentInstructor.id}`, {
+            state: { instructor: currentInstructor },
+          });
+        } else {
+          alert("لم يتم العثور على بيانات المدرس.");
+        }
+      } catch (err) {
+        console.error("فشل في جلب بيانات المدرس:", err);
       }
-    } catch (err) {
-      console.error("فشل في جلب بيانات المدرس:", err);
-    }
-  } else if (userRole === "student") {
-    try {
-      const students = await getStudents();
-      const currentStudent = students.find(
-        (student) => student.email === userEmail
-      );
+    } else if (userRole === "student") {
+      try {
+        const students = await getStudents();
+        const currentStudent = students.find(
+          (student) => student.email === userEmail
+        );
 
-      if (currentStudent) {
-        navigate(`/student-profile/${currentStudent.id}`, {
-          state: { student: currentStudent },
-        });
-      } else {
-        alert("لم يتم العثور على بيانات الطالب.");
+        if (currentStudent) {
+          navigate(`/student-profile/${currentStudent.id}`, {
+            state: { student: currentStudent },
+          });
+        } else {
+          alert("لم يتم العثور على بيانات الطالب.");
+        }
+      } catch (err) {
+        console.error("فشل في جلب بيانات الطالب:", err);
       }
-    } catch (err) {
-      console.error("فشل في جلب بيانات الطالب:", err);
+    } else {
+      alert("دور المستخدم غير معروف.");
     }
-  } else {
-    alert("دور المستخدم غير معروف.");
-  }
-};
+  };
 
   return (
     <header
@@ -167,7 +158,7 @@ const handleMyAccountClick = async () => {
           </div>
 
           <div className="hidden md:flex items-center space-x-4 rtl:space-x-reverse">
-            {isLoggedIn ? (
+            {isLoggedIn && (
               <div className="flex items-center space-x-4 rtl:space-x-reverse">
                 <button
                   onClick={handleMyAccountClick}
@@ -184,21 +175,6 @@ const handleMyAccountClick = async () => {
                   <span className="font-cairo">تسجيل الخروج</span>
                 </button>
               </div>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="text-white font-cairo hover:text-islamic-golden transition-colors"
-                >
-                  تسجيل الدخول
-                </Link>
-                <Link
-                  to="/signup"
-                  className="bg-islamic-golden text-white px-4 py-2 rounded-lg font-cairo hover:bg-opacity-90 transition-colors"
-                >
-                  إنشاء حساب
-                </Link>
-              </>
             )}
           </div>
 
@@ -227,7 +203,7 @@ const handleMyAccountClick = async () => {
               </Link>
             ))}
             <div className="border-t pt-4 mt-4">
-              {isLoggedIn ? (
+              {isLoggedIn && (
                 <>
                   <button
                     onClick={() => {
@@ -247,23 +223,6 @@ const handleMyAccountClick = async () => {
                   >
                     تسجيل الخروج
                   </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    className="block py-2 px-4 text-gray-700 hover:text-islamic-primary font-cairo"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    تسجيل الدخول
-                  </Link>
-                  <Link
-                    to="/signup"
-                    className="block py-2 px-4 bg-islamic-golden text-white rounded mt-2 text-center font-cairo hover:bg-opacity-90"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    إنشاء حساب
-                  </Link>
                 </>
               )}
             </div>

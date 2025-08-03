@@ -1,11 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  getStudents,
-  getAttendance,
-  getCourses,
-  getRecitationsByCourseId,
-} from "../data/mockData";
+import { getStudents, getCourses, Recitations } from "../data/mockData";
 import {
   ArrowRight,
   User,
@@ -51,13 +46,14 @@ const StudentProfile = () => {
   };
 
   const age = calculateAge(student?.birth_date);
+
   useEffect(() => {
     const fetchStudentCourses = async () => {
       if (!student || !student.courses) return;
 
       try {
         setCoursesLoading(true);
-        const allCourses = await getCourses(); // جلب جميع الكورسات
+        const allCourses = await getCourses();
         const filteredCourses = allCourses.filter((course) =>
           student.courses.some((c) => c.id === course.id)
         );
@@ -86,6 +82,12 @@ const StudentProfile = () => {
         }
 
         setStudent(matchedStudent);
+
+        // ✅ فلترة الريستيشن لهذا الطالب
+        const filteredRecitations = Recitations.filter(
+          (recitation) => recitation.student_id === matchedStudent.id
+        );
+        setRecitations(filteredRecitations);
       } catch (error) {
         console.error("خطأ أثناء تحميل بيانات الطالب:", error);
         navigate("/students");
@@ -96,6 +98,10 @@ const StudentProfile = () => {
 
     fetchStudent();
   }, [id, navigate]);
+
+  const filtered = Recitations.filter((r) => r?.student_id === student?.id);
+  console.log("✅ Recitations for student:", filtered);
+
   useEffect(() => {
     const fetchAttendance = async () => {
       const data = await getAttendance();
@@ -104,50 +110,11 @@ const StudentProfile = () => {
 
     fetchAttendance();
   }, []);
-  useEffect(() => {
-  const fetchRecitations = async () => {
-    if (!student || !student.courses) return;
-
-    try {
-      let allStudentRecitations = [];
-
-      for (const course of student.courses) {
-        const res = await getRecitationsByCourseId(course.id);
-
-        if (!res.recitations_by_lesson) continue;
-
-        for (const lesson of res.recitations_by_lesson) {
-          const studentRecits = lesson.recitations?.filter(
-            (r) => r.student_id?.toString() === student.id.toString()
-          );
-
-          // أضف معلومات الدرس لكل ريسايتشن (اختياري حسب الحاجة)
-          const enrichedRecitations = studentRecits.map((r) => ({
-            ...r,
-            lesson_id: lesson.lesson_id,
-            lesson_title: lesson.lesson_title,
-            lesson_date: lesson.lesson_date,
-            course_id: res.course_id,
-            course_title: res.course_title,
-          }));
-
-          allStudentRecitations.push(...enrichedRecitations);
-        }
-      }
-
-      setRecitations(allStudentRecitations);
-    } catch (error) {
-      console.error("خطأ أثناء تحميل الريسايتيشن:", error);
-    }
-  };
-
-  fetchRecitations();
-}, [student]);
 
   if (!student) {
     return (
-      <LoadingSpinner 
-        message="جاري تحميل ملف الطالب..." 
+      <LoadingSpinner
+        message="جاري تحميل ملف الطالب..."
         fullScreen={true}
         size="xlarge"
       />
@@ -155,15 +122,15 @@ const StudentProfile = () => {
   }
   if (loading) {
     return (
-      <LoadingSpinner 
-        message="جاري تحميل بيانات الطالب..." 
+      <LoadingSpinner
+        message="جاري تحميل بيانات الطالب..."
         fullScreen={true}
         size="xlarge"
       />
     );
   }
+
   return (
-  
     <div className="min-h-screen bg-islamic-gray-light">
       <div className="container mx-auto px-4 pt-24 pb-4">
         <button
@@ -181,8 +148,12 @@ const StudentProfile = () => {
             {/* 🟢 صورة الطالب الدائرية مع إطار ذهبي */}
             <div className="relative">
               <img
-                src={student.image}
+                src={student.image || "https://example.com/default-image.jpg"}
                 alt={student.name}
+                onError={(e) => {
+                  e.target.onerror = null; // منع التكرار
+                  e.target.src = "https://example.com/default-image.jpg"; // رابط الصورة الاحتياطية من الإنترنت أو API
+                }}
                 className="w-32 h-32 rounded-full object-cover border-4 border-islamic-golden shadow-lg"
               />
             </div>
@@ -241,8 +212,7 @@ const StudentProfile = () => {
                 <div className="flex items-center space-x-4 rtl:space-x-reverse mb-4">
                   <img
                     src={
-                      student?.instructors.image ||
-                      "/default-instructor.png"
+                      student?.instructors.image || "/default-instructor.png"
                     }
                     alt={student?.instructors.name || "مدرس"}
                     className="w-16 h-16 rounded-full object-cover"
@@ -266,17 +236,23 @@ const StudentProfile = () => {
                   <div className="flex items-center space-x-2 rtl:space-x-reverse">
                     <Phone size={16} className="text-islamic-golden" />
                     <span className="font-cairo text-gray-700 text-sm">
-                      {student?.instructors.phone_number || "رقم هاتف غير متوفر"}
+                      {student?.instructors.phone_number ||
+                        "رقم هاتف غير متوفر"}
                     </span>
                   </div>
                   {student?.instructors.religious_qualifications && (
                     <div className="mt-3">
-                      <h5 className="font-cairo font-medium text-islamic-dark mb-2">المؤهلات:</h5>
+                      <h5 className="font-cairo font-medium text-islamic-dark mb-2">
+                        المؤهلات:
+                      </h5>
                       <div className="text-sm text-gray-600 font-cairo">
-                        {Array.isArray(student.instructors.religious_qualifications) 
-                          ? student.instructors.religious_qualifications.join(", ")
-                          : student.instructors.religious_qualifications
-                        }
+                        {Array.isArray(
+                          student.instructors.religious_qualifications
+                        )
+                          ? student.instructors.religious_qualifications.join(
+                              ", "
+                            )
+                          : student.instructors.religious_qualifications}
                       </div>
                     </div>
                   )}
@@ -305,7 +281,7 @@ const StudentProfile = () => {
                   <BookOpen size={32} className="text-white" />
                 </div>
                 <h4 className="font-cairo font-bold text-2xl text-islamic-dark mb-2">
-                  {recitations.current_juz}
+                  {recitations[0]?.current_juz || "غير متوفر"}
                 </h4>
               </div>
 
@@ -316,7 +292,7 @@ const StudentProfile = () => {
                     الصفحات المكتملة:
                   </span>
                   <span className="font-cairo font-bold text-islamic-primary">
-                    {recitations.current_juz_page} من 20 صفحة
+                    {recitations[0]?.current_juz_page || 0} من 20 صفحة
                   </span>
                 </div>
 
@@ -324,15 +300,19 @@ const StudentProfile = () => {
                   <div
                     className="bg-islamic-primary h-4 rounded-full transition-all duration-300"
                     style={{
-                      width: `${(recitations.current_juz_page / 20) * 100}%`,
+                      width: `${
+                        ((recitations[0]?.current_juz_page || 0) / 20) * 100
+                      }%`,
                     }}
                   ></div>
                 </div>
 
                 <div className="text-center">
                   <span className="font-cairo text-lg font-bold text-islamic-golden">
-                    {Math.round((recitations.current_juz_page / 20) * 100)}% من
-                    الجزء الحالي
+                    {Math.round(
+                      ((recitations[0]?.current_juz_page || 0) / 20) * 100
+                    )}
+                    % من الجزء الحالي الجزء الحالي
                   </span>
                 </div>
               </div>
@@ -445,10 +425,11 @@ const StudentProfile = () => {
                   <tbody>
                     {selectedCourse.lessons
                       .map((lesson) => {
-                        const lessonAttendance = attendance.find(
-                          (a) =>
-                            a.lesson.id === lesson.id &&
-                            a.student.id === Number(student.id)
+                        console.log("student =", student);
+                        console.log("lesson =", lesson);
+
+                        const lessonAttendance = student.attendances.find(
+                          (a) => a.lesson_id === lesson.id
                         );
 
                         return {
@@ -596,7 +577,10 @@ const StudentProfile = () => {
           ) : courses.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {courses.map((course) => (
-                <div key={course.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div
+                  key={course.id}
+                  className="bg-white rounded-lg shadow-lg overflow-hidden"
+                >
                   <div className="relative h-48 overflow-hidden">
                     <img
                       src={course.image}
@@ -605,7 +589,7 @@ const StudentProfile = () => {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                   </div>
-                  
+
                   <div className="p-6">
                     <h3 className="font-cairo font-bold text-xl text-islamic-dark mb-2">
                       {course.title}
@@ -613,18 +597,18 @@ const StudentProfile = () => {
                     <p className="text-gray-600 font-cairo mb-4 text-sm">
                       {course.description}
                     </p>
-                    
+
                     <div className="space-y-2 mb-4">
                       <div className="flex items-center space-x-2 rtl:space-x-reverse">
                         <User size={16} className="text-islamic-primary" />
                         <span className="text-gray-700 font-cairo text-sm">
-                          المدرس: {Array.isArray(course.instructor) 
-                            ? course.instructor.map(i => i.name).join(", ")
-                            : course.instructor?.name || "غير معروف"
-                          }
+                          المدرس:{" "}
+                          {Array.isArray(course.instructor)
+                            ? course.instructor.map((i) => i.name).join(", ")
+                            : course.instructor?.name || "غير معروف"}
                         </span>
                       </div>
-                      
+
                       {course.start_date && (
                         <div className="flex items-center space-x-2 rtl:space-x-reverse">
                           <Calendar size={16} className="text-islamic-golden" />
@@ -633,7 +617,7 @@ const StudentProfile = () => {
                           </span>
                         </div>
                       )}
-                      
+
                       {course.course_start_time && (
                         <div className="flex items-center space-x-2 rtl:space-x-reverse">
                           <Clock size={16} className="text-islamic-light" />
@@ -643,12 +627,14 @@ const StudentProfile = () => {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Progress bar if available */}
                     {student.progress && (
                       <div className="mb-4">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-cairo text-gray-600">التقدم</span>
+                          <span className="text-sm font-cairo text-gray-600">
+                            التقدم
+                          </span>
                           <span className="text-sm font-cairo text-islamic-primary font-bold">
                             {student.progress}%
                           </span>
@@ -683,7 +669,9 @@ const StudentProfile = () => {
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="font-cairo text-gray-600">المدرس المشرف:</span>
+                    <span className="font-cairo text-gray-600">
+                      المدرس المشرف:
+                    </span>
                     <span className="font-cairo font-medium">
                       {student.instructors?.name || "غير معروف"}
                     </span>
@@ -691,14 +679,20 @@ const StudentProfile = () => {
                   <div className="flex justify-between">
                     <span className="font-cairo text-gray-600">التخصص:</span>
                     <span className="font-cairo font-medium">
-                      {Array.isArray(student.instructors?.religious_qualifications)
-                        ? student.instructors.religious_qualifications.join(", ")
-                        : student.instructors?.religious_qualifications || "غير محدد"
-                      }
+                      {Array.isArray(
+                        student.instructors?.religious_qualifications
+                      )
+                        ? student.instructors.religious_qualifications.join(
+                            ", "
+                          )
+                        : student.instructors?.religious_qualifications ||
+                          "غير محدد"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="font-cairo text-gray-600">عدد الدورات:</span>
+                    <span className="font-cairo text-gray-600">
+                      عدد الدورات:
+                    </span>
                     <span className="font-cairo font-medium">
                       {courses.length} دورة
                     </span>
@@ -715,7 +709,7 @@ const StudentProfile = () => {
                 <p className="font-cairo text-gray-600 mb-4">
                   نسبة الإنجاز الإجمالية
                 </p>
-                
+
                 {/* Teacher's Notes */}
                 {student.notes && (
                   <div className="bg-white p-4 rounded-lg">
